@@ -54,6 +54,12 @@ public class AnagramSortedValuesDriver extends Configured implements Tool
 
     public static void main(String[] args) throws Exception
     {
+        cleanInput();
+        int exitCode = ToolRunner.run(new AnagramSortedValuesDriver(), args);
+        System.exit(exitCode);
+    }
+
+    static void cleanInput() throws Exception{
         if(new File("output").isDirectory()){
             deleteFolder(new File("output"));
         }
@@ -96,11 +102,8 @@ public class AnagramSortedValuesDriver extends Configured implements Tool
                 }
             }
         }
-
-
-        int exitCode = ToolRunner.run(new AnagramSortedValuesDriver(), args);
-        System.exit(exitCode);
     }
+
     static void deleteFolder(File file){
         for (File subFile : file.listFiles()) {
             if(subFile.isDirectory()) {
