@@ -10,12 +10,12 @@ import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.shaded.org.apache.http.HttpResponse;
-import org.apache.hadoop.shaded.org.apache.http.client.methods.HttpGet;
-import org.apache.hadoop.shaded.org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.hadoop.shaded.org.apache.http.impl.client.HttpClients;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 
 public class AnagramSortedValuesDriver extends Configured implements Tool
 {
