@@ -25,6 +25,122 @@ public class WordCount extends Configured implements Tool {
 
     public static String inputPath = "";
     public static String outputPath = "";
+    public static class AnagramSortedValuesMapper extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text>
+    {
+
+        // Input Key: Line Number
+        // Input Value: Word
+        //
+        // Output Key: Sorted Characters of Word # Word
+        // Output Value: Word
+        @Override
+        public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter)
+                throws IOException
+        {
+            String wordString = value.toString().trim();
+            char[] wordArray = wordString.toCharArray();
+            Arrays.sort(wordArray);
+            String wordStringSorted = String.valueOf(wordArray);
+            output.collect(new Text(wordStringSorted + "#" + wordString), new Text(wordString));
+        }
+    }
+
+    public static class AnagramSortedValuesOutputValueGroupingComparator extends WritableComparator
+    {
+
+        public AnagramSortedValuesOutputValueGroupingComparator()
+        {
+            super(Text.class, true);
+        }
+
+        // Key: Sorted Characters of Word # Word
+        // Grouping: Sorted Characters of Word
+        // This will ensure all the words that are anagrams of each other are grouped together
+        @Override
+        public int compare(WritableComparable wc1, WritableComparable wc2)
+        {
+            Text compositeKey1 = (Text) wc1;
+            Text compositeKey2 = (Text) wc2;
+
+            String naturalKey1 = compositeKey1.toString().split("#")[0];
+            String naturalKey2 = compositeKey2.toString().split("#")[0];
+
+            return naturalKey1.compareTo(naturalKey2);
+        }
+    }
+    public static class AnagramSortedValuesReducer extends MapReduceBase implements Reducer<Text, Text, Text, Text> {
+
+        ArrayList<String> listOfLists = new ArrayList<>();
+        ArrayList<String> wordCount = new ArrayList<>();
+        Boolean anagramFound = false;
+
+        @Override
+        public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter)
+                throws IOException {
+            String newKey = "";
+            String newValue = "";
+            while (values.hasNext()) {
+                if (newKey.length() == 0) {
+                    newKey = values.next().toString();
+                    anagramFound = false;
+                } else {
+                    newValue += ", " + values.next().toString();
+                    anagramFound = true;
+                }
+            }
+            String finalValue = "";
+
+            finalValue = Stream.of(
+                    Arrays.stream((newKey + newValue).split(", "))
+                            .distinct().toArray(String[]::new)).map(String::new).collect(Collectors.joining(", "));
+
+
+            newValue = newKey + newValue;
+
+            List<String> list = Arrays.asList(newValue.split(", "));
+            Set<String> distinct = new HashSet<>(list);
+
+            for (String s : distinct) {
+                wordCount.add(s);
+                wordCount.add("" + Collections.frequency(list, s));
+            }
+
+            if (finalValue.split(", ").length > 1) {
+                newValue = Stream.of(
+                        Arrays.stream(newValue.split(", "))
+                                .distinct().toArray(String[]::new)).map(String::new).collect(Collectors.joining(", "));
+                listOfLists.add(newValue.split(", ").length + ", " + newValue);
+                output.collect(new Text("b"), new Text("b"));
+            }
+        }
+
+        @Override
+        public void close() {
+            Collections.sort(listOfLists);
+
+            String filePath = "output/final.txt";
+            try {
+                File f1 = new File(filePath);
+
+                FileWriter fw = new FileWriter(f1);
+                BufferedWriter out = new BufferedWriter(fw);
+                for (String val : listOfLists) {
+                    String anagrams = "";
+                    int count = 0;
+                    for (String anagram : Arrays.copyOfRange(val.split(", "), 1, val.split(", ").length)) {
+                        anagrams = anagrams + ", " + anagram + ": " + wordCount.get(wordCount.indexOf(anagram) + 1);
+                        count = count + Integer.parseInt(wordCount.get(wordCount.indexOf(anagram) + 1));
+                    }
+                    anagrams = anagrams.substring(2);
+                    out.write("Unique Anagram Count: " + val.split(", ")[0] + ", Total Anagram Count: " + count + ", Anagrams: " + "[" + anagrams + "]" + "\n");
+                }
+                out.flush();
+                out.close();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
     @Override
     public int run(String[] args) throws Exception
     {
@@ -122,120 +238,5 @@ public class WordCount extends Configured implements Tool {
         file.delete();
     }
 
-    public class AnagramSortedValuesMapper extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text>
-    {
-
-        // Input Key: Line Number
-        // Input Value: Word
-        //
-        // Output Key: Sorted Characters of Word # Word
-        // Output Value: Word
-        @Override
-        public void map(LongWritable key, Text value, OutputCollector<Text, Text> output, Reporter reporter)
-                throws IOException
-        {
-            String wordString = value.toString().trim();
-            char[] wordArray = wordString.toCharArray();
-            Arrays.sort(wordArray);
-            String wordStringSorted = String.valueOf(wordArray);
-            output.collect(new Text(wordStringSorted + "#" + wordString), new Text(wordString));
-        }
-    }
-
-    public class AnagramSortedValuesOutputValueGroupingComparator extends WritableComparator
-    {
-
-        public AnagramSortedValuesOutputValueGroupingComparator()
-        {
-            super(Text.class, true);
-        }
-
-        // Key: Sorted Characters of Word # Word
-        // Grouping: Sorted Characters of Word
-        // This will ensure all the words that are anagrams of each other are grouped together
-        @Override
-        public int compare(WritableComparable wc1, WritableComparable wc2)
-        {
-            Text compositeKey1 = (Text) wc1;
-            Text compositeKey2 = (Text) wc2;
-
-            String naturalKey1 = compositeKey1.toString().split("#")[0];
-            String naturalKey2 = compositeKey2.toString().split("#")[0];
-
-            return naturalKey1.compareTo(naturalKey2);
-        }
-    }
-    public class AnagramSortedValuesReducer extends MapReduceBase implements Reducer<Text, Text, Text, Text> {
-
-        ArrayList<String> listOfLists = new ArrayList<>();
-        ArrayList<String> wordCount = new ArrayList<>();
-        Boolean anagramFound = false;
-
-        @Override
-        public void reduce(Text key, Iterator<Text> values, OutputCollector<Text, Text> output, Reporter reporter)
-                throws IOException {
-            String newKey = "";
-            String newValue = "";
-            while (values.hasNext()) {
-                if (newKey.length() == 0) {
-                    newKey = values.next().toString();
-                    anagramFound = false;
-                } else {
-                    newValue += ", " + values.next().toString();
-                    anagramFound = true;
-                }
-            }
-            String finalValue = "";
-
-            finalValue = Stream.of(
-                    Arrays.stream((newKey + newValue).split(", "))
-                            .distinct().toArray(String[]::new)).map(String::new).collect(Collectors.joining(", "));
-
-
-            newValue = newKey + newValue;
-
-            List<String> list = Arrays.asList(newValue.split(", "));
-            Set<String> distinct = new HashSet<>(list);
-
-            for (String s : distinct) {
-                wordCount.add(s);
-                wordCount.add("" + Collections.frequency(list, s));
-            }
-
-            if (finalValue.split(", ").length > 1) {
-                newValue = Stream.of(
-                        Arrays.stream(newValue.split(", "))
-                                .distinct().toArray(String[]::new)).map(String::new).collect(Collectors.joining(", "));
-                listOfLists.add(newValue.split(", ").length + ", " + newValue);
-                output.collect(new Text("b"), new Text("b"));
-            }
-        }
-
-        @Override
-        public void close() {
-            Collections.sort(listOfLists);
-
-            String filePath = "output/final.txt";
-            try {
-                File f1 = new File(filePath);
-
-                FileWriter fw = new FileWriter(f1);
-                BufferedWriter out = new BufferedWriter(fw);
-                for (String val : listOfLists) {
-                    String anagrams = "";
-                    int count = 0;
-                    for (String anagram : Arrays.copyOfRange(val.split(", "), 1, val.split(", ").length)) {
-                        anagrams = anagrams + ", " + anagram + ": " + wordCount.get(wordCount.indexOf(anagram) + 1);
-                        count = count + Integer.parseInt(wordCount.get(wordCount.indexOf(anagram) + 1));
-                    }
-                    anagrams = anagrams.substring(2);
-                    out.write("Unique Anagram Count: " + val.split(", ")[0] + ", Total Anagram Count: " + count + ", Anagrams: " + "[" + anagrams + "]" + "\n");
-                }
-                out.flush();
-                out.close();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }
-    }
+    
 }
