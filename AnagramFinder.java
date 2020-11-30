@@ -110,7 +110,7 @@ public class AnagramFinder {
         job.setJarByClass(AnagramFinder.class);
         job.setMapperClass(AnagramsMapper.class);
         job.setReducerClass(AnagramsReducer.class);
-
+        job.setNumReduceTasks(1);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(Text.class);
 
