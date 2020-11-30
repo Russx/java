@@ -5,13 +5,7 @@ import org.apache.hadoop.mapreduce.Job;
 
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
-
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.http.HttpResponse;
@@ -28,22 +22,20 @@ public class AnagramFinder {
 
     public static String inputPath = "";
     public static String outputPath = "";
+    public static String stopWords = "";
     public static class AnagramsMapper extends Mapper<Object, Text, Text, Text> {
-        String[] stopWords = {"meat"};
 
         public void map(Object key, Text value, Context context)
                 throws IOException, InterruptedException {
             StringTokenizer iterable = new StringTokenizer(value.toString());
 
             while (iterable.hasMoreTokens()) {
-                String word = iterable.nextToken().toLowerCase();
+                String word = iterable.nextToken().toLowerCase().replaceAll("\\p{Punct}", "");
                 char[] arr = word.toCharArray();
                 Arrays.sort(arr);
                 String wordKey = new String(arr);
-                for (String stopWord : stopWords) {
-                    if (!word.equals(stopWord)) {
-                        context.write(new Text(wordKey), new Text(word));
-                    }
+                if(stopWords.indexOf(word.toLowerCase())==-1) {
+                    context.write(new Text(wordKey), new Text(word));
                 }
             }
         }
@@ -100,10 +92,20 @@ public class AnagramFinder {
 
         }
     }
+
     public static void main(String[] args) throws Exception {
         inputPath=args[0];
         outputPath=args[1];
-        cleanInput();
+        CloseableHttpClient httpclient = HttpClients.createDefault();
+        HttpGet httpget = new HttpGet("https://www.textfixer.com/tutorials/common-english-words-with-contractions.txt");
+        HttpResponse httpresponse = httpclient.execute(httpget);
+        Scanner sc = new Scanner(httpresponse.getEntity().getContent());
+        StringBuffer sb = new StringBuffer();
+        while(sc.hasNext()) {
+            sb.append(sc.next());
+        }
+        String result = sb.toString();
+        stopWords = result.replaceAll("<[^>]*>", "").toLowerCase();
         Configuration conf = new Configuration();
         Job job = Job.getInstance(conf, "Anagram");
 
@@ -118,59 +120,5 @@ public class AnagramFinder {
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
         System.exit(job.waitForCompletion(true) ? 0 : 1);
-    }
-    static void cleanInput() throws Exception{
-
-        if(new File(outputPath).isDirectory()){
-            deleteFolder(new File(outputPath));
-        }
-        File dir = new File(inputPath);
-        File[] directoryListing = dir.listFiles();
-        if (directoryListing != null) {
-            for (File child : directoryListing) {
-                String contents = null;
-                try {
-                    contents = new String(Files.readAllBytes(Paths.get(child.getPath()))).replaceAll("\\p{Punct}", "");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                String[] lines = contents.split("\\s+");
-                CloseableHttpClient httpclient = HttpClients.createDefault();
-                HttpGet httpget = new HttpGet("https://www.textfixer.com/tutorials/common-english-words-with-contractions.txt");
-                HttpResponse httpresponse = httpclient.execute(httpget);
-                Scanner sc = new Scanner(httpresponse.getEntity().getContent());
-                StringBuffer sb = new StringBuffer();
-                while(sc.hasNext()) {
-                    sb.append(sc.next());
-                }
-                String result = sb.toString();
-                result = result.replaceAll("<[^>]*>", "").toLowerCase();
-
-                try {
-                    File f1 = new File(child.getPath());
-
-                    FileWriter fw = new FileWriter(f1);
-                    BufferedWriter out = new BufferedWriter(fw);
-                    for(String s : lines)
-                        if(result.indexOf(s.toLowerCase())==-1) {
-                            out.write(s + "\n");
-                        }
-                    out.flush();
-                    out.close();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
-        }
-    }
-    static void deleteFolder(File file){
-        for (File subFile : file.listFiles()) {
-            if(subFile.isDirectory()) {
-                deleteFolder(subFile);
-            } else {
-                subFile.delete();
-            }
-        }
-        file.delete();
     }
 }
