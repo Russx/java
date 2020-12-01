@@ -30,10 +30,12 @@ public class AnagramFinder {
             StringTokenizer iterable = new StringTokenizer(value.toString());
 
             while (iterable.hasMoreTokens()) {
+                //remove punctuation
                 String word = iterable.nextToken().toLowerCase().replaceAll("\\p{Punct}", "");
                 char[] arr = word.toCharArray();
                 Arrays.sort(arr);
                 String wordKey = new String(arr);
+                //skip stop words
                 if(stopWords.indexOf(word.toLowerCase())==-1) {
                     context.write(new Text(wordKey), new Text(word));
                 }
@@ -47,6 +49,7 @@ public class AnagramFinder {
         public void reduce(Text key, Iterable<Text> values, Context context)
                 throws IOException, InterruptedException {
             String newValue = null;
+            //collect anagrams
             for (Text val : values) {
                 if (newValue == null) {
                     newValue = val.toString();
@@ -55,37 +58,43 @@ public class AnagramFinder {
                     newValue = newValue + ", " + val.toString();
                 }
             }
-            String finalValue ="";
-
-            finalValue = Stream.of(
+            //create remove duplicates
+            String finalValue = Stream.of(
                     Arrays.stream((newValue).split(", "))
                             .distinct().toArray(String[]::new)).map(String::new).collect(Collectors.joining(", "));
-            List<String> list = Arrays.asList(newValue.split(", "));
-            Set<String> distinct = new HashSet<>(list);
-            for (String s: distinct) {
-                wordCount.add(s);
-                wordCount.add(""+Collections.frequency(list, s));
-            }
+
 
             if (finalValue.split(", ").length > 1)
             {
-                newValue = Stream.of(
-                        Arrays.stream(newValue.split(", "))
-                                .distinct().toArray(String[]::new)).map(String::new).collect(Collectors.joining(", "));
-                listOfLists.add(newValue.split(", ").length +", "+newValue);
+                //get frequency of each word
+                List<String> list = Arrays.asList(newValue.split(", "));
+                Set<String> distinct = new HashSet<>(list);
+                for (String s: distinct) {
+                    wordCount.add(s);
+                    wordCount.add(""+Collections.frequency(list, s));
+                }
+
+                String[] sortedNewValue = finalValue.split(", ");
+                Arrays.sort(sortedNewValue);
+                listOfLists.add(sortedNewValue.length +", "+Arrays.toString(sortedNewValue));
             }
         }
 
         public void cleanup(Context context) throws IOException, InterruptedException {
+            //sort whole output
             Collections.sort(listOfLists);
             for(String val : listOfLists)
             {
+                //remove square brackets from value
+                val =  val.replaceAll("\\[","").replaceAll("\\]","");
                 String anagrams = "";
                 int count = 0;
+                //get the frequency of each word
                 for(String anagram : Arrays.copyOfRange(val.split(", "), 1, val.split(", ").length)){
                     anagrams = anagrams +", " +anagram +": " + wordCount.get(wordCount.indexOf(anagram)+1);
                     count = count + Integer.parseInt(wordCount.get(wordCount.indexOf(anagram)+1));
                 }
+                //remove starting comma
                 anagrams = anagrams.substring(2);
                 context.write(new Text("Unique Anagram Count: " + val.split(", ")[0] ), new Text( ", Total Anagram Count: " + count+", Anagrams: "+"["+anagrams+"]"));
             }
@@ -96,6 +105,7 @@ public class AnagramFinder {
     public static void main(String[] args) throws Exception {
         inputPath=args[0];
         outputPath=args[1];
+        //get stopwords
         CloseableHttpClient httpclient = HttpClients.createDefault();
         HttpGet httpget = new HttpGet("https://www.textfixer.com/tutorials/common-english-words-with-contractions.txt");
         HttpResponse httpresponse = httpclient.execute(httpget);
